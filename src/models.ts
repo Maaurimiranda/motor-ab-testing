@@ -33,7 +33,7 @@ export interface Booking {
   // Registro histórico: nunca se pisa. El frontend no lo lee; lee effectiveVariant.
   experimentId?: string;
   experimentVariant?: Variant;
-  metadata: { originalDatetime?: Date; paidAt?: Date };
+  metadata: { originalDatetime?: Date; paidAt?: Date; examsAcknowledgedAt?: Date };
 }
 
 export type SerializedBooking = Booking & { effectiveVariant: Variant };
