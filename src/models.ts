@@ -38,8 +38,19 @@ export interface Booking {
 
 export type SerializedBooking = Booking & { effectiveVariant: Variant };
 
+// Valores de dominio en español, tal como se muestran en las pills.
+export const SpecialtyCategorySchema = z.enum([
+  'Endocrinología Ginecológica',
+  'Salud Sexual',
+  'Salud Mental y Bienestar',
+  'Antecedentes Mamarios u Oncológicos',
+  'Piso Pélvico',
+]);
+export type SpecialtyCategory = z.infer<typeof SpecialtyCategorySchema>;
+
 export interface Professional {
   _id: string;
   name: string;
   specialtyType: 'gynecology' | 'nutrition';
+  specialtyCategories?: SpecialtyCategory[]; // opcional: sin categorías sigue siendo válida
 }

@@ -26,6 +26,21 @@ test('el paso de exámenes, ya promovido, registra el consentimiento en cualquie
   assert.ok((await ack.json()).metadata.examsAcknowledgedAt);
 });
 
+test('el filtro solo existe para la variante de prueba, y desaparece con el kill switch', async () => {
+  await new ExperimentService(ctx.db).create({ experimentId: 'filtro', description: 'filtro', splitPercentage: 100 });
+  const { _id } = await (await post('/bookings', { email: 'ana@example.com' })).json();
+  const path = `/bookings/${_id}/specialists/search-v2?categories=${encodeURIComponent('Salud Sexual')}`;
+
+  const ok = await fetch(url(path));
+  assert.equal(ok.status, 200);
+  assert.equal((await ok.json()).matchType, 'none'); // no hay profesionales cargadas
+
+  assert.equal((await fetch(url(`/bookings/${_id}/specialists/search-v2?categories=Cardiolog%C3%ADa`))).status, 400);
+
+  await new ExperimentService(ctx.db).closeActive('kill-switch');
+  assert.equal((await fetch(url(path))).status, 404);
+});
+
 test('valida el body y responde 404 a un booking inexistente', async () => {
   const { _id } = await (await post('/bookings')).json();
   assert.equal((await post(`/bookings/${_id}/start`, { email: 'no-es-email' })).status, 400);

@@ -20,4 +20,6 @@ export async function ensureIndexes(db: Db) {
     { unique: true, partialFilterExpression: { active: true }, name: 'un_solo_experimento_activo' },
   );
   await experiments(db).createIndex({ experimentId: 1 }, { unique: true });
+  // Compuesto: toda búsqueda filtra primero por tipo de profesional y después por categoría.
+  await professionals(db).createIndex({ specialtyType: 1, specialtyCategories: 1 });
 }
