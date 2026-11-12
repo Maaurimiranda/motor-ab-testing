@@ -13,6 +13,7 @@
     "typecheck": "tsc",
     "experiment:create": "node scripts/create-experiment.ts",
     "experiment:close": "node scripts/close-active-experiment.ts",
+    "seed": "node scripts/seed-professionals.ts",
     "simulate": "node scripts/simulate.ts",
     "report": "node scripts/report.ts"
   },

@@ -1,8 +1,9 @@
 import { MongoClient, type Db } from 'mongodb';
-import type { Booking, Experiment } from './models.ts';
+import type { Booking, Experiment, Professional } from './models.ts';
 
 export const experiments = (db: Db) => db.collection<Experiment>('experiments');
 export const bookings = (db: Db) => db.collection<Booking>('bookings');
+export const professionals = (db: Db) => db.collection<Professional>('professionals');
 
 export async function connect(uri: string, dbName = 'motor_ab_testing') {
   const client = await MongoClient.connect(uri);

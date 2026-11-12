@@ -37,3 +37,9 @@ export interface Booking {
 }
 
 export type SerializedBooking = Booking & { effectiveVariant: Variant };
+
+export interface Professional {
+  _id: string;
+  name: string;
+  specialtyType: 'gynecology' | 'nutrition';
+}

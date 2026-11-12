@@ -23,6 +23,11 @@ export function createApp(db: Db) {
     res.json(await service.get(req.params.id));
   });
 
+  app.get('/bookings/:id/specialists/search', async (req, res) => {
+    const service = await getBookingService(db, req.params.id);
+    res.json(await service.searchSpecialists(req.params.id));
+  });
+
   app.post('/bookings/:id/start', async (req, res) => {
     const { email } = EmailBody.parse(req.body);
     const service = await getBookingService(db, req.params.id);

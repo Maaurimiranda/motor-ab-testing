@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import type { Db } from 'mongodb';
-import { bookings } from '../db.ts';
+import type { Db, Filter } from 'mongodb';
+import { bookings, professionals } from '../db.ts';
 import { ExperimentService, normalizeEmail } from '../experiment.service.ts';
-import type { Booking, SerializedBooking } from '../models.ts';
+import type { Booking, Professional, SerializedBooking } from '../models.ts';
 
 export const HOUR = 60 * 60 * 1000;
 export const RESCHEDULE_HOURS_NOTICE = 24;
@@ -88,6 +88,19 @@ export class BookingStableService {
     // Marca de tiempo y no booleano: queda registrado cuándo consintió.
     await bookings(this.db).updateOne({ _id: bookingId }, { $set: { 'metadata.examsAcknowledgedAt': new Date() } });
     return this.get(bookingId);
+  }
+
+  /** Grilla de profesionales del wizard: todas las ginecólogas, por nombre. */
+  async searchSpecialists(bookingId: string) {
+    await this.findOrThrow(bookingId);
+    return this.findGynecologists({});
+  }
+
+  findGynecologists(filter: Filter<Professional>) {
+    return professionals(this.db)
+      .find({ specialtyType: 'gynecology', ...filter })
+      .sort({ name: 1 })
+      .toArray();
   }
 
   async get(bookingId: string) {

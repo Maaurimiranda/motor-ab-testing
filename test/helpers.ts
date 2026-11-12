@@ -18,6 +18,7 @@ export function useDb() {
   beforeEach(async () => {
     await ctx.db.collection('bookings').deleteMany({});
     await ctx.db.collection('experiments').deleteMany({});
+    await ctx.db.collection('professionals').deleteMany({});
   });
   after(async () => {
     await client.close();
