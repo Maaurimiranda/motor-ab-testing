@@ -6,7 +6,7 @@ Infraestructura para correr experimentos A/B sobre un flujo de alto tráfico sin
 
 Este repositorio acompaña mi **Práctica Profesional Supervisada** (Ingeniería en Sistemas de Información, UTN FRM, 2026). Durante la práctica construí este motor sobre el wizard de agendamiento de una plataforma de salud en producción. Por confidencialidad, el código de la organización no puede publicarse: describe su infraestructura y es parte de un sistema con datos de salud.
 
-Con autorización de la dirección, acá reimplementé **la misma lógica** sobre un dominio genérico de reserva de turnos y sin dependencias de esa infraestructura. Los nombres de las piezas (`BookingStableService`, `BookingTestingService`, `getBookingService`, `effectiveVariant`, la colección `experiments`) son los mismos que se usan en el informe.
+Con autorización de la dirección, acá reimplementé **la misma lógica** sobre un dominio genérico de reserva de turnos y sin dependencias de esa infraestructura. Incluye los tres trabajos de la práctica: el motor y los dos experimentos que corrieron sobre él (anticipación de exámenes y filtro de categorías clínicas), cada uno con su ciclo completo en el historial de Git. Los nombres de las piezas (`BookingStableService`, `BookingTestingService`, `getBookingService`, `effectiveVariant`, la colección `experiments`, `searchSpecialistsV2`, `matchType`) son los mismos que se usan en el informe.
 
 ## Probarlo en 5 minutos
 
@@ -14,13 +14,14 @@ Requiere Node 22.18 o superior (corre TypeScript sin compilar) y, para la API y 
 
 ```bash
 npm install
-npm test            # 14 tests contra un MongoDB real en memoria, sin Docker
+npm test            # 21 tests contra un MongoDB real en memoria, sin Docker
 ```
 
 Recorrido completo de un experimento:
 
 ```bash
 docker compose up -d                                   # MongoDB en localhost:27017
+npm run seed                                           # profesionales ficticias con categorías
 npm run experiment:create -- --id=control-aa --description="Control A/A" --split=50 --confirm
 npm run experiment:create -- --id=otro --description="otro" --confirm   # la base lo rechaza: ya hay uno activo
 npm run simulate -- --patients=1000                    # 1000 pacientes sintéticas recorren el wizard
@@ -34,10 +35,14 @@ La API (`npm start`, puerto 3000):
 |---|---|---|
 | `POST` | `/bookings` | Inicia una reserva (`{ "email"? }`) |
 | `POST` | `/bookings/:id/start` | Identifica a la paciente (`{ "email" }`) y le asigna variante |
+| `GET` | `/bookings/:id/specialists/search` | Grilla de profesionales (búsqueda original, intacta) |
+| `GET` | `/bookings/:id/specialists/search-v2?categories=a,b` | Filtro de categorías clínicas, con `matchType` |
+| `POST` | `/bookings/:id/exams-acknowledgement` | Consentimiento del aviso de exámenes |
 | `POST` | `/bookings/:id/slot` | Elige fecha y hora (`{ "datetime" }`) |
 | `POST` | `/bookings/:id/pay` | Paga: la conversión |
-| `POST` | `/bookings/:id/reschedule` | Reagenda (`{ "datetime" }`); la regla cambia según la variante |
+| `POST` | `/bookings/:id/reschedule` | Reagenda (`{ "datetime" }`) |
 | `GET` | `/bookings/:id` | Devuelve la reserva con su `effectiveVariant` |
+| `PUT` | `/professionals/:id/specialty-categories` | Carga las categorías de una ginecóloga |
 
 ## Cómo funciona
 
@@ -61,11 +66,25 @@ request ──► getBookingService(bookingId) ──┬──► BookingStableS
 | Kill switch sin deploy | `scripts/close-active-experiment.ts` | `active: false` con `--reason=kill-switch`. Dry-run por defecto. |
 | Medición | `scripts/report.ts`, `src/stats.ts` | Conversión por paciente, z-test de dos proporciones, balance contra el split y control de asignación fija. |
 
-### Experimento de ejemplo
+### Los experimentos de la práctica, en el historial
 
-`BookingTestingService` trae un experimento real de la práctica, generalizado: **reagendamiento flexible**. Las citas compradas con menos de 24 h de anticipación se pueden reagendar mientras no hayan ocurrido, mientras que el flujo estable exige 24 h de aviso. Para un control A/A, la clase queda vacía.
+Cada experimento entra como cambio en `BookingTestingService` (el estable no se toca) y sale con un commit de cierre que lo promueve. Recorrer el historial muestra el ciclo completo:
 
-**Cierre disciplinado:** si la variante gana, su método pasa a `BookingStableService` y se borra la clase de prueba; si pierde, se borra sin tocar el estable. Nunca conviven más de dos versiones.
+```bash
+git log --oneline
+git show <commit>        # el diff de cada etapa
+```
+
+| Etapa | Commit | Qué cambia |
+|---|---|---|
+| Motor | `feat: motor de A/B testing…` | Infraestructura; `BookingTestingService` vacía = control A/A |
+| Anticipación de exámenes, en prueba | `feat(anticipacion): …` | La variante suma el consentimiento de exámenes (`examsAcknowledgedAt`) y deja reagendar citas compradas con menos de 24 h. El endpoint de exámenes responde 404 fuera de `testing` |
+| Anticipación de exámenes, cierre | `chore(anticipacion): …` | Ganó: los métodos pasan al estable y la clase de prueba vuelve a quedar vacía |
+| Grilla base | `feat: grilla de profesionales…` | Búsqueda original de profesionales en el estable |
+| Filtro de categorías, en prueba | `feat(filtro): …` | `searchSpecialistsV2`: coincidencia total → parcial ordenada → ninguna (`matchType`). La búsqueda original no cambia (test de regresión) |
+| Filtro de categorías, cierre | `chore(filtro): …` | Ganó: se promueve al estable y la clase de prueba vuelve a quedar vacía |
+
+**Cierre disciplinado:** si la variante gana, sus métodos pasan a `BookingStableService` y la clase de prueba queda vacía; si pierde, se borran sin tocar el estable. Nunca conviven más de dos versiones. Hoy `BookingTestingService` está vacía, lista para el próximo experimento.
 
 ### El bug que encontró el control A/A
 
@@ -85,13 +104,14 @@ src/
   db.ts                     colecciones e índices
   hash.ts                   hash de asignación
   experiment.service.ts     resolver de variante y ciclo de vida del experimento
+  professional.service.ts   carga de categorías clínicas
   bookings/
-    stable.service.ts       flujo estable + bookingSerializer
-    testing.service.ts      variante de prueba (experimento de ejemplo)
+    stable.service.ts       flujo estable + bookingSerializer + experimentos promovidos
+    testing.service.ts      variante de prueba (hoy vacía)
     factory.ts              getBookingService
   stats.ts                  z-test y balance
   app.ts, server.ts         API
-scripts/                    crear, cerrar (kill switch), simular, reportar
+scripts/                    crear, cerrar (kill switch), simular, reportar, datos de prueba
 test/                       tests con MongoDB en memoria
 ```
 
