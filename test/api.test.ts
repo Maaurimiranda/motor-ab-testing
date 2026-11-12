@@ -19,16 +19,11 @@ after(() => server?.close());
 const post = (path: string, body: object = {}) =>
   fetch(url(path), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
-test('el paso de exámenes solo existe para la variante de prueba, y desaparece con el kill switch', async () => {
-  await new ExperimentService(ctx.db).create({ experimentId: 'examenes', description: 'examenes', splitPercentage: 100 });
+test('el paso de exámenes, ya promovido, registra el consentimiento en cualquier booking', async () => {
   const { _id } = await (await post('/bookings', { email: 'ana@example.com' })).json();
-
   const ack = await post(`/bookings/${_id}/exams-acknowledgement`);
   assert.equal(ack.status, 200);
   assert.ok((await ack.json()).metadata.examsAcknowledgedAt);
-
-  await new ExperimentService(ctx.db).closeActive('kill-switch');
-  assert.equal((await post(`/bookings/${_id}/exams-acknowledgement`)).status, 404);
 });
 
 test('valida el body y responde 404 a un booking inexistente', async () => {

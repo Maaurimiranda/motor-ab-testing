@@ -6,6 +6,14 @@ import type { Booking, SerializedBooking } from '../models.ts';
 
 export const HOUR = 60 * 60 * 1000;
 export const RESCHEDULE_HOURS_NOTICE = 24;
+const SHORT_NOTICE_HOURS = 24;
+
+/** Cita comprada con menos de 24 h de anticipación (se calcula al vuelo, sin persistir un flag). */
+export function isShortNotice(booking: Booking): boolean {
+  const appointment = booking.metadata.originalDatetime ?? booking.datetime;
+  if (!appointment) return false;
+  return appointment.getTime() - booking.createdAt.getTime() < SHORT_NOTICE_HOURS * HOUR;
+}
 
 export class NotFoundError extends Error {}
 export class RescheduleNotAllowedError extends Error {}
@@ -64,10 +72,22 @@ export class BookingStableService {
     return this.get(bookingId);
   }
 
-  /** Política estable: se reagenda con más de 24 h de anticipación. */
+  /**
+   * Política de reagendamiento: con más de 24 h de aviso; las citas de anticipación corta,
+   * mientras no hayan ocurrido (promovido desde el experimento "anticipación de exámenes").
+   */
   canReschedule(booking: Booking, now: Date): boolean {
     if (booking.status !== 'paid' || !booking.datetime) return false;
+    if (isShortNotice(booking)) return booking.datetime.getTime() > now.getTime();
     return booking.datetime.getTime() - now.getTime() > RESCHEDULE_HOURS_NOTICE * HOUR;
+  }
+
+  /** La paciente confirma, antes de elegir fecha, que entiende qué exámenes necesita. */
+  async acknowledgeExams(bookingId: string) {
+    await this.findOrThrow(bookingId);
+    // Marca de tiempo y no booleano: queda registrado cuándo consintió.
+    await bookings(this.db).updateOne({ _id: bookingId }, { $set: { 'metadata.examsAcknowledgedAt': new Date() } });
+    return this.get(bookingId);
   }
 
   async get(bookingId: string) {

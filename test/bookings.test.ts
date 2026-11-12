@@ -70,7 +70,7 @@ test('un booking de un experimento cerrado no se reasigna ni vuelve a testing cu
   assert.equal(retomado.effectiveVariant, 'stable');
 });
 
-test('experimento de ejemplo: la variante de prueba deja reagendar citas de anticipación corta', () => {
+test('promovido a estable: se pueden reagendar citas de anticipación corta mientras no ocurrieron', () => {
   const now = new Date('2026-09-01T10:00:00Z');
   const booking: Booking = {
     _id: 'b1',
@@ -79,9 +79,12 @@ test('experimento de ejemplo: la variante de prueba deja reagendar citas de anti
     datetime: new Date(now.getTime() + 5 * HOUR), // ...para dentro de 5 h: anticipación corta
     metadata: {},
   };
-  assert.equal(new BookingStableService(ctx.db).canReschedule(booking, now), false);
-  assert.equal(new BookingTestingService(ctx.db).canReschedule(booking, now), true);
+  const stable = new BookingStableService(ctx.db);
+  assert.equal(stable.canReschedule(booking, now), true);
 
   const pasada = { ...booking, datetime: new Date(now.getTime() - HOUR), createdAt: new Date(now.getTime() - 10 * HOUR) };
-  assert.equal(new BookingTestingService(ctx.db).canReschedule(pasada, now), false);
+  assert.equal(stable.canReschedule(pasada, now), false);
+
+  const normal = { ...booking, createdAt: new Date(now.getTime() - 10 * 24 * HOUR) }; // comprada con días de aviso
+  assert.equal(stable.canReschedule(normal, now), false); // a 5 h de la cita rige la política de 24 h
 });
