@@ -1,0 +1,30 @@
+{
+  "name": "motor-ab-testing",
+  "version": "1.0.0",
+  "description": "Motor de A/B testing para un wizard de reserva de turnos: asignación determinística, flujo estable/prueba, kill switch y cierre disciplinado.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node src/server.ts",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc",
+    "experiment:create": "node scripts/create-experiment.ts",
+    "experiment:close": "node scripts/close-active-experiment.ts",
+    "simulate": "node scripts/simulate.ts",
+    "report": "node scripts/report.ts"
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "mongodb": "^6.22.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.2",
+    "mongodb-memory-server": "^10.4.3",
+    "typescript": "^5.9.3"
+  }
+}
