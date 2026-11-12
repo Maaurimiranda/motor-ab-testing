@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { BookingStableService } from '../src/bookings/stable.service.ts';
-import { BookingTestingService } from '../src/bookings/testing.service.ts';
 import { professionals } from '../src/db.ts';
 import { setSpecialtyCategories } from '../src/professional.service.ts';
 import { useDb } from './helpers.ts';
@@ -17,8 +16,8 @@ const seed = () =>
   ]);
 const ids = (ps: { _id: string }[]) => ps.map((p) => p._id);
 
-async function search(categories: Parameters<BookingTestingService['searchSpecialistsV2']>[1]) {
-  const service = new BookingTestingService(ctx.db);
+async function search(categories: Parameters<BookingStableService['searchSpecialistsV2']>[1]) {
+  const service = new BookingStableService(ctx.db);
   const { _id } = await service.init();
   const result = await service.searchSpecialistsV2(_id, categories);
   return { matchType: result.matchType, ids: ids(result.specialists) };

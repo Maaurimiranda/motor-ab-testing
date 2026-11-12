@@ -26,19 +26,21 @@ test('el paso de exámenes, ya promovido, registra el consentimiento en cualquie
   assert.ok((await ack.json()).metadata.examsAcknowledgedAt);
 });
 
-test('el filtro solo existe para la variante de prueba, y desaparece con el kill switch', async () => {
-  await new ExperimentService(ctx.db).create({ experimentId: 'filtro', description: 'filtro', splitPercentage: 100 });
+test('el filtro, ya promovido, responde a cualquier booking y valida las categorías', async () => {
   const { _id } = await (await post('/bookings', { email: 'ana@example.com' })).json();
-  const path = `/bookings/${_id}/specialists/search-v2?categories=${encodeURIComponent('Salud Sexual')}`;
-
-  const ok = await fetch(url(path));
+  const ok = await fetch(url(`/bookings/${_id}/specialists/search-v2?categories=${encodeURIComponent('Salud Sexual')}`));
   assert.equal(ok.status, 200);
   assert.equal((await ok.json()).matchType, 'none'); // no hay profesionales cargadas
-
   assert.equal((await fetch(url(`/bookings/${_id}/specialists/search-v2?categories=Cardiolog%C3%ADa`))).status, 400);
+});
 
+test('una ruta que solo existe en testing deja de responder con el kill switch', async () => {
+  // El mecanismo de gating que usaron los dos experimentos mientras corrían, sobre la variante efectiva.
+  await new ExperimentService(ctx.db).create({ experimentId: 'exp', description: 'exp', splitPercentage: 100 });
+  const { _id } = await (await post('/bookings', { email: 'ana@example.com' })).json();
+  assert.equal((await (await fetch(url(`/bookings/${_id}`))).json()).effectiveVariant, 'testing');
   await new ExperimentService(ctx.db).closeActive('kill-switch');
-  assert.equal((await fetch(url(path))).status, 404);
+  assert.equal((await (await fetch(url(`/bookings/${_id}`))).json()).effectiveVariant, 'stable');
 });
 
 test('valida el body y responde 404 a un booking inexistente', async () => {

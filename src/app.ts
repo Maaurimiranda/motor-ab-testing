@@ -3,7 +3,6 @@ import type { Db } from 'mongodb';
 import { z } from 'zod';
 import { getBookingService } from './bookings/factory.ts';
 import { BookingStableService, NotFoundError, RescheduleNotAllowedError } from './bookings/stable.service.ts';
-import { BookingTestingService } from './bookings/testing.service.ts';
 import { SpecialtyCategorySchema } from './models.ts';
 import { setSpecialtyCategories } from './professional.service.ts';
 
@@ -31,12 +30,10 @@ export function createApp(db: Db) {
     res.json(await service.searchSpecialists(req.params.id));
   });
 
-  // Endpoint de la variante de prueba: en el flujo estable no existe.
   app.get('/bookings/:id/specialists/search-v2', async (req, res) => {
     const raw = typeof req.query.categories === 'string' ? req.query.categories.split(',').filter(Boolean) : [];
     const categories = z.array(SpecialtyCategorySchema).parse(raw);
     const service = await getBookingService(db, req.params.id);
-    if (!(service instanceof BookingTestingService)) throw new NotFoundError('No disponible en esta variante');
     res.json(await service.searchSpecialistsV2(req.params.id, categories));
   });
 

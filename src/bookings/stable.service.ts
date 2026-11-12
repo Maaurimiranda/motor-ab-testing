@@ -2,7 +2,9 @@ import { randomUUID } from 'node:crypto';
 import type { Db, Filter } from 'mongodb';
 import { bookings, professionals } from '../db.ts';
 import { ExperimentService, normalizeEmail } from '../experiment.service.ts';
-import type { Booking, Professional, SerializedBooking } from '../models.ts';
+import type { Booking, Professional, SerializedBooking, SpecialtyCategory } from '../models.ts';
+
+export type MatchType = 'exact' | 'partial' | 'none';
 
 export const HOUR = 60 * 60 * 1000;
 export const RESCHEDULE_HOURS_NOTICE = 24;
@@ -94,6 +96,28 @@ export class BookingStableService {
   async searchSpecialists(bookingId: string) {
     await this.findOrThrow(bookingId);
     return this.findGynecologists({});
+  }
+
+  /**
+   * Filtro de categorías clínicas (promovido desde su experimento). Todas las categorías elegidas
+   * (exact); si ninguna profesional las tiene todas, las que tienen alguna, ordenadas por
+   * coincidencias (partial); si tampoco, lista vacía (none). Sin categorías, la grilla completa.
+   */
+  async searchSpecialistsV2(
+    bookingId: string,
+    categories: SpecialtyCategory[],
+  ): Promise<{ specialists: Professional[]; matchType: MatchType }> {
+    await this.findOrThrow(bookingId);
+    if (categories.length === 0) return { specialists: await this.findGynecologists({}), matchType: 'exact' };
+
+    const exact = await this.findGynecologists({ specialtyCategories: { $all: categories } });
+    if (exact.length > 0) return { specialists: exact, matchType: 'exact' };
+
+    // ponytail: orden en memoria, son pocas profesionales; pasar a una agregación si el volumen crece.
+    const matches = (p: Professional) => p.specialtyCategories!.filter((c) => categories.includes(c)).length;
+    const partial = (await this.findGynecologists({ specialtyCategories: { $in: categories } }))
+      .sort((a, b) => matches(b) - matches(a)); // sort estable: a igual coincidencia, sigue por nombre
+    return partial.length > 0 ? { specialists: partial, matchType: 'partial' } : { specialists: [], matchType: 'none' };
   }
 
   findGynecologists(filter: Filter<Professional>) {
